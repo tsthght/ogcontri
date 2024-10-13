@@ -26,7 +26,7 @@ static void ogProcessUtility_hook(Node* parsetree, const char* queryString, Para
     bool isCTAS) {
     Query *query = (Query *)parsetree;
     // char *queryString = nodeToString(query);
-    ereport(LOG, (errmsg("[full sql]ProcessUtility_hook: %s, Transaction ID: %u", queryString,GetCurrentTransactionId())));
+    ereport(LOG, (errmsg("[full sql]ProcessUtility_hook: %s, Transaction ID: %u", queryString, GetCurrentTransactionId())));
     if (ProcessUtility_old_hook) {
         ProcessUtility_old_hook(parsetree,queryString,params,isTopLevel,dest,sentToRemote,completionTag,isCTAS);
     }
@@ -46,8 +46,8 @@ void _PG_init(void) {
     ProcessUtility_old_hook = ProcessUtility_hook;
     ProcessUtility_hook = ogProcessUtility_hook;
 
-    ExecutorRun_old_hook = ExecutorRun_hook;
-    ExecutorRun_hook = ogExecutorRun_hook;
+    //ExecutorRun_old_hook = ExecutorRun_hook;
+    //ExecutorRun_hook = ogExecutorRun_hook;
 }
 
 PG_MODULE_MAGIC;
