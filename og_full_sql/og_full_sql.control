@@ -1,5 +1,5 @@
 # pg_savior extension
 comment = 'print full sql'
-default_version = '1.0'
+default_version = '1'
 relocatable = true
 module_pathname = '$libdir/og_full_sql'
