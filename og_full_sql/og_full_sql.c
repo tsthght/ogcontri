@@ -65,8 +65,6 @@ static void ogExecutorRun_hook(QueryDesc* queryDesc, ScanDirection direction, lo
         standard_ExecutorRun(queryDesc, direction, count);
         return;        
     }
-    int number = queryDesc->params->numParams;
-    ereport(LOG, (errmsg("xxxx xxxx, %d", number))); 
 
     for (int paramno = 0; paramno < params->numParams; paramno++) {
         ParamExternData* prm = &params->params[paramno];
