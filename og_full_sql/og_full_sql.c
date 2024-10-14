@@ -36,7 +36,7 @@ completionTag, isCTAS);
 
 static void ogExecutorRun_hook(QueryDesc* queryDesc, ScanDirection direction, long count) {
     TransactionId xid = GetCurrentTransactionId();
-    ereport(LOG, (errmsg("[full sql]ExecutorRun_hook: %s, Transaction ID: %u", queryDesc->sourceText, xid)));
+    ereport(LOG, (errmsg("[full sql]ExecutorRun_hook: %s, Transaction ID: %u, paramlist: %x", queryDesc->sourceText, xid, queryDesc->params)));
     standard_ExecutorRun(queryDesc, direction, count);
 }
 
