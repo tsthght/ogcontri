@@ -13,9 +13,12 @@
 #include "utils/elog.h"
 #include "tcop/utility.h"
 #include "lib/stringinfo.h"
+#include "nodes/pg_list.h"
 
 static THR_LOCAL ExecutorRun_hook_type ExecutorRun_old_hook = NULL;
 static THR_LOCAL ProcessUtility_hook_type ProcessUtility_old_hook = NULL;
+
+static char *tablename = "*";
 
 static void ogProcessUtility_hook(Node* parsetree, const char* queryString, ParamListInfo params,
     bool isTopLevel, DestReceiver* dest,
@@ -26,7 +29,7 @@ static void ogProcessUtility_hook(Node* parsetree, const char* queryString, Para
     bool isCTAS) {
     Query *query = (Query *)parsetree;
     // char *queryString = nodeToString(query);
-    ereport(LOG, (errmsg("[full sql]ProcessUtility_hook: %s, Transaction ID: %u", queryString,GetCurrentTransactionId())));
+    ereport(LOG, (errmsg("[full sql]ProcessUtility_hook: %s, Transaction ID: %u, tbn: %s", queryString,GetCurrentTransactionId(), tablename)));
     standard_ProcessUtility(parsetree, queryString, params, isTopLevel, dest, 
 #ifdef PGXC
 sentToRemote, 
@@ -56,12 +59,43 @@ static void getTypeOutputInfo(Oid type, Oid* typOutput, bool* typIsVarlena)
 }
 
 static void ogExecutorRun_hook(QueryDesc* queryDesc, ScanDirection direction, long count) {
-    TransactionId xid = GetCurrentTransactionId();
+    bool isLog = false;
+    if (strcmp(tablename, "*") == 0) {
+        isLog = true;
+    } else if (strcmp(tablename, "") == 0) {
+        
+    } else {
+        List* list = queryDesc->plannedstmt->rtable;
+        ListCell* lc = NULL;
+        foreach (lc, list) {
+            RangeTblEntry* rte = (RangeTblEntry*)lfirst(lc);
+            Assert(IsA(rte, RangeTblEntry));
+            if (rte == NULL) {
+                continue;
+            }
+            char src[64] = {0};
+            char dst[64] = {0};
+            sprintf(src, "%s\n", rte->relname);
+            sprintf(dst, "%s\n", tablename);
+            ereport(LOG, (errmsg("rel: %s, %d, tn: %s, %d, cmp: %d", src, sizeof(src), dst, sizeof(dst), pg_strcasecmp(dst, src))));
+            if (pg_strcasecmp(dst, src) == 0) {
+               isLog = true;
+               break; 
+            }
+        }
+    }
 
+    if (!isLog) {
+        standard_ExecutorRun(queryDesc, direction, count);   
+        return;
+    } 
+
+    TransactionId xid = GetCurrentTransactionId();
     StringInfo param_str = makeStringInfo();
 
     ParamListInfo params = queryDesc->params;
     if (params == NULL) {
+        ereport(LOG, (errmsg("[full sql]ExecutorRun_hook: %s, Transaction ID: %u", queryDesc->sourceText, xid))); 
         standard_ExecutorRun(queryDesc, direction, count);
         return;        
     }
@@ -108,11 +142,22 @@ static void ogExecutorRun_hook(QueryDesc* queryDesc, ScanDirection direction, lo
 void _PG_init(void);
 
 void _PG_init(void) {
+
+
     ProcessUtility_old_hook = ProcessUtility_hook;
     ProcessUtility_hook = ogProcessUtility_hook;
 
     ExecutorRun_old_hook = ExecutorRun_hook;
     ExecutorRun_hook = ogExecutorRun_hook;
+
+    DefineCustomStringVariable("full_sql.tablename",
+                                "log which table's full sql", 
+                                NULL, 
+                                &tablename, 
+                                "*",
+                                PGC_POSTMASTER,
+                                0, 
+                                NULL, NULL, NULL);
 }
 
 PG_MODULE_MAGIC;
