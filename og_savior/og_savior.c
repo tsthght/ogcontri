@@ -45,7 +45,14 @@ static bool ensureWhereClause(QueryDesc *queryDesc) {
     return true;
   }
 
-  return walkPlanTree(plan);
+  bool ret = false;
+  ModifyTable * mt = (ModifyTable*) queryDesc->plannedstmt->planTree;
+  ListCell *cell;
+  foreach (cell, mt->plans) {
+      Node *node = (Node*)lfirst(cell);
+      ret = ret | walkPlanTree((Plan*)node);
+  }
+  return ret;
 }
 
 // walk the plan tree to find if there is a WHERE clause
@@ -75,7 +82,9 @@ bool walkPlanTree(Plan *plan) {
   }
 
   // queries which uses index scan
-  if (plan->type == T_IndexScan) {
+  if (plan->type == T_IndexScan ||
+      plan->type == T_IndexOnlyScan ||
+      plan->type == T_BitmapIndexScan) {
     IndexScan *indexScan = (IndexScan *)plan;
     if (indexScan->indexqual != NULL) {
       return true;
@@ -103,28 +112,14 @@ static void ExecutorRun_hook_savior(QueryDesc *queryDesc,
   if (ExecutorRun_old_hook)
     ExecutorRun_old_hook(queryDesc, direction, count);
   else {
-    ModifyTable * mt = (ModifyTable*) queryDesc->plannedstmt->planTree;
     switch (queryDesc->operation) {
     case CMD_DELETE:
-      ListCell *cell;
-      foreach (cell, mt->plans) {
-        Node *node = (Node*)lfirst(cell);
-        //if (node->type == T_SeqScan) {
-        //    SeqScan* ss = (SeqScan*)node;
-            elog(INFO, "type: %s", nodeToString(node));
-        //}
-        // We are checking operation expression
-      }
-      elog(INFO, "pg_savior: DELETE statement detected");
-      standard_ExecutorRun(queryDesc, direction, count);
-      /*
       if (ensureWhereClause(queryDesc)) {
         standard_ExecutorRun(queryDesc, direction, count);
       } else {
-        elog(INFO, "pg_savior: WHERE clause is mandatory for a DELETE statement, type is %d", nodeTag(plan));
+        elog(INFO, "pg_savior: WHERE clause is mandatory for a DELETE statement");
         insert_meta(queryDesc);
       }
-      */
       break;
     case CMD_UPDATE:
       if (ensureWhereClause(queryDesc)) {
@@ -137,6 +132,7 @@ static void ExecutorRun_hook_savior(QueryDesc *queryDesc,
     default:
       standard_ExecutorRun(queryDesc, direction, count);
     }
+
   }
 }
 
