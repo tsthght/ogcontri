@@ -94,7 +94,7 @@ bool walkPlanTree(Plan *plan) {
       return true;
     }
   }
-  return p ;
+  return hasWhereClause ;
 }
 
 static void ExecutorRun_hook_savior(QueryDesc *queryDesc,
@@ -102,20 +102,21 @@ static void ExecutorRun_hook_savior(QueryDesc *queryDesc,
                                     ) {
   if (ExecutorRun_old_hook)
     ExecutorRun_old_hook(queryDesc, direction, count);
-  else
+  else {
+    ModifyTable * mt = (ModifyTable*) queryDesc->plannedstmt->planTree;
     switch (queryDesc->operation) {
     case CMD_DELETE:
-      ModifyTable * mt = (ModifyTable*) queryDesc->plannedstmt->planTree;
       ListCell *cell;
       foreach (cell, mt->plans) {
         Node *node = (Node*)lfirst(cell);
-        elog(INFO, "type: %d", nodeToString(node));
-        // We are checking operation expression
-        if (node->type == T_Seq) {
-          return true;
+        if (node->type == T_SeqScan) {
+            SeqScan* ss = (SeqScan*)node;
+            elog(INFO, "type: %s", nodeToString(node));
         }
+        // We are checking operation expression
       }
       elog(INFO, "pg_savior: DELETE statement detected");
+      standard_ExecutorRun(queryDesc, direction, count);
       /*
       if (ensureWhereClause(queryDesc)) {
         standard_ExecutorRun(queryDesc, direction, count);
@@ -136,6 +137,7 @@ static void ExecutorRun_hook_savior(QueryDesc *queryDesc,
     default:
       standard_ExecutorRun(queryDesc, direction, count);
     }
+  }
 }
 
 void _PG_init(void);
