@@ -94,7 +94,7 @@ bool walkPlanTree(Plan *plan) {
       return true;
     }
   }
-  return hasWhereClause;
+  return p ;
 }
 
 static void ExecutorRun_hook_savior(QueryDesc *queryDesc,
@@ -105,13 +105,25 @@ static void ExecutorRun_hook_savior(QueryDesc *queryDesc,
   else
     switch (queryDesc->operation) {
     case CMD_DELETE:
+      ModifyTable * mt = (ModifyTable*) queryDesc->plannedstmt->planTree;
+      ListCell *cell;
+      foreach (cell, mt->plans) {
+        Node *node = (Node*)lfirst(cell);
+        elog(INFO, "type: %d", nodeToString(node));
+        // We are checking operation expression
+        if (node->type == T_Seq) {
+          return true;
+        }
+      }
       elog(INFO, "pg_savior: DELETE statement detected");
+      /*
       if (ensureWhereClause(queryDesc)) {
         standard_ExecutorRun(queryDesc, direction, count);
       } else {
-        elog(INFO, "pg_savior: WHERE clause is mandatory for a DELETE statement");
+        elog(INFO, "pg_savior: WHERE clause is mandatory for a DELETE statement, type is %d", nodeTag(plan));
         insert_meta(queryDesc);
       }
+      */
       break;
     case CMD_UPDATE:
       if (ensureWhereClause(queryDesc)) {
