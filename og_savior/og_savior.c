@@ -109,10 +109,10 @@ static void ExecutorRun_hook_savior(QueryDesc *queryDesc,
       ListCell *cell;
       foreach (cell, mt->plans) {
         Node *node = (Node*)lfirst(cell);
-        if (node->type == T_SeqScan) {
-            SeqScan* ss = (SeqScan*)node;
+        //if (node->type == T_SeqScan) {
+        //    SeqScan* ss = (SeqScan*)node;
             elog(INFO, "type: %s", nodeToString(node));
-        }
+        //}
         // We are checking operation expression
       }
       elog(INFO, "pg_savior: DELETE statement detected");
